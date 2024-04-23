@@ -37,6 +37,7 @@ cors = CORS(app, resources={r"/*": {"origins": "http://127.0.0.1:8000"}})
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'log')
 filename = 'test.log'
 loader = Taikyoku_loader(os.path.join(path, filename))
+loader.reset(3)
 
 
 def allowed_file(filename):
@@ -67,7 +68,6 @@ def step_forward():
         for item in data[f'player{i}']['sutehai']:
            if item['hai'] in pai_dict:
                item['hai'] = pai_dict[item['hai']]
-
     return jsonify(data)
 
 
