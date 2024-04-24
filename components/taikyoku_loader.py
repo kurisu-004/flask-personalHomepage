@@ -285,7 +285,12 @@ class Taikyoku_loader(object):
             self.players[i].print_player()
 
     # 导出当前状态的信息，用于Encoder的encode函数
-    def export_info(self):
+    def export_info(self, mask=False):
+        # 如果启用mask，则分别输出三个视角下对手手牌被mask的信息
+        if mask:
+            mask 
+
+
         info = {
             'taikyoku_info': {
                 'bakaze': self.taikyoku_info.bakaze,
