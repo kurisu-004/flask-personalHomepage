@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask.json.provider import JSONProvider
 
-from components.Taikyoku_loader import Taikyoku_loader
+from components.taikyoku_loader import Taikyoku_loader
 from components.dict import pai_dict
 import os, orjson
 from enum import Enum
