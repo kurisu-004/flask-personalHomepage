@@ -70,6 +70,24 @@ def step_forward():
                item['hai'] = pai_dict[item['hai']]
     return jsonify(data)
 
+@app.route('/api/step_backward', methods=['GET'])
+def step_backward():
+    loader.step_backward()
+    data = loader.export_info()
+
+    # 将手牌信息转换为前端所需的格式
+    for i in range(4):
+        tehai = data[f'player{i}']['tehai']
+        temp = []
+        for hai in tehai:
+            temp.append(pai_dict[hai])
+        data[f'player{i}']['tehai'] = temp
+
+        for item in data[f'player{i}']['sutehai']:
+           if item['hai'] in pai_dict:
+               item['hai'] = pai_dict[item['hai']]
+    return jsonify(data)
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)
