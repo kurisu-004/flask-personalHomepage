@@ -6,7 +6,7 @@ from typing import List, Dict
 
 
 # 定义编码器类
-# 接受一个Taikyoku_loader进行初始化
+# 接受一个由Taikyoku_loader的export_info函数的返回值进行初始化
 class Encoder():
     def __init__(self, exported_info: Dict[str, object]) -> None:
         # 参数:
@@ -22,7 +22,12 @@ class Encoder():
         encoded_tile = np.zeros((35, len(tiles)))
 
         for index, tile in enumerate(tiles):
+
             if tile == None:
+                continue
+            
+            # 如果当前牌被mask，则不进行编码
+            if tile == -1:
                 continue
 
             tile_type = tile // 4
@@ -43,7 +48,7 @@ class Encoder():
         encoded_action = np.zeros((len(Action) + 1, len(actions)))
 
         for index, action in enumerate(actions):
-            encoded_action[action['action'].value, index] = 1
+            encoded_action[action['action'], index] = 1
             encoded_action[-1, index] = action['player']
 
         return encoded_action
@@ -59,7 +64,7 @@ class Encoder():
         # 第11～14行表示各个玩家的点数
 
         public_info = np.zeros((14, 1))
-        public_info[0, 0] = self.exported_info['taikyoku_info']['bakaze'].value
+        public_info[0, 0] = self.exported_info['taikyoku_info']['bakaze']
         public_info[1, 0] = self.exported_info['taikyoku_info']['kyoku']
         public_info[2, 0] = self.exported_info['taikyoku_info']['honba']
         public_info[3, 0] = self.exported_info['taikyoku_info']['oya']
@@ -80,7 +85,7 @@ class Encoder():
 
         return public_info
 
-    def encode(self) -> np.ndarray:
+    def encode(self, mask_type=0) -> np.ndarray:
         # 返回值:
         # 一个numpy数组，包含了所有的信息
 
@@ -90,11 +95,51 @@ class Encoder():
         # dora表示牌
         dora_indicators = self._encode_tiles(self.exported_info['taikyoku_info']['dora'])
 
-        # 四个玩家的手牌
+        # 四个玩家的手牌和副露信息
         tehai = []
+        naki = []
+        # masked_position = []
+        masked_flag_list = []
         for i in range(4):
+            # 添加手牌信息
+
+            #县将str类型的手牌转换为int类型
+            self.exported_info[f'player{i}']['tehai'] = [encode_dict['hai_2int'][x] for x in self.exported_info[f'player{i}']['tehai'] if x != None]
             tehai.append(self._encode_tiles(self.exported_info[f'player{i}']['tehai']))
 
+            # 添加副露信息
+            temp_naki = []
+            for naki_info in self.exported_info[f'player{i}']['naki']:
+                temp_naki.extend(naki_info['result'])
+            naki.append(self._encode_tiles(temp_naki))
+
+            # mask手牌
+            if mask_type == 0:
+            # 每个玩家随机mask一半的牌
+                masked_tehai = self._mask_tehai(self.exported_info[f'player{i}']['tehai'], type=0)
+                # masked_position.append(self._encode_tiles(masked_tehai))
+                masked_flag = np.zeros((1, len(masked_tehai)))
+                for index, tile in enumerate(masked_tehai):
+                    if tile == -1:
+                        masked_flag[0,index] = 1
+                masked_flag_list.append(masked_flag)
+            elif mask_type == 1:
+            # mask除了自己的所有牌
+                if i == 0:
+                    masked_tehai = self._mask_tehai(self.exported_info[f'player{i}']['tehai'], type=2)
+                    masked_flag = np.zeros((1, len(masked_tehai)))
+                    for index, tile in enumerate(masked_tehai):
+                        if tile == -1:
+                            masked_flag[0,index] = 1
+                    masked_flag_list.append(masked_flag)
+                else:
+                    masked_tehai = self._mask_tehai(self.exported_info[f'player{i}']['tehai'], type=1)
+                    masked_flag = np.zeros((1, len(masked_tehai)))
+                    for index, tile in enumerate(masked_tehai):
+                        if tile == -1:
+                            masked_flag[0,index] = 1
+                    masked_flag_list.append(masked_flag)
+        
         # 对局信息
         actions = []
         tiles = []
@@ -111,15 +156,62 @@ class Encoder():
         dora_indicators = self._pad_matrix(dora_indicators, max_row)
         for i in range(4):
             tehai[i] = self._pad_matrix(tehai[i], max_row)
-        
+            naki[i] = self._pad_matrix(naki[i], max_row)
+            # masked_position[i] = self._pad_matrix(masked_position[i], max_row)
+
         # 定义CLS
         cls = np.ones((max_row, 1))
+        # 定义SEP,全为2
+        sep = np.ones((max_row, 1)) * 2
+
+
         
         # 拼接
-        encoded_info = np.concatenate((cls, public_info, dora_indicators, tehai[0],tehai[1], tehai[2], tehai[3], encoded_record), axis=1)
-        
+        encoded_info = np.concatenate(( cls, public_info, sep, dora_indicators, sep,
+                                        tehai[0], sep, naki[0], sep,
+                                        tehai[1], sep, naki[1], sep,
+                                        tehai[2], sep, naki[2], sep,
+                                        tehai[3], sep, naki[3], sep,
+                                        encoded_record), axis=1)
+        # masked_info = np.concatenate((  np.zeros((cls.shape[0], cls.shape[1]), dtype=np.int8),
+        #                                 np.zeros((public_info.shape[0], public_info.shape[1]), dtype=np.int8),
+        #                                 np.zeros((dora_indicators.shape[0], dora_indicators.shape[1]), dtype=np.int8),
+        #                                 masked_position[0], np.zeros((naki[0].shape[0], naki[0].shape[1]), dtype=np.int8),
+        #                                 masked_position[1], np.zeros((naki[1].shape[0], naki[1].shape[1]), dtype=np.int8),
+        #                                 masked_position[2], np.zeros((naki[2].shape[0], naki[2].shape[1]), dtype=np.int8),
+        #                                 masked_position[3], np.zeros((naki[3].shape[0], naki[3].shape[1]), dtype=np.int8),
+        #                                 np.zeros((encoded_record.shape[0], encoded_record.shape[1]), dtype=np.int8)), axis=1)
+        masked_tiles = np.concatenate(( np.zeros((1, cls.shape[1]), dtype=np.int8),
+                                        np.zeros((1, public_info.shape[1]), dtype=np.int8), np.zeros((1, 1)),
+                                        np.zeros((1, dora_indicators.shape[1]), dtype=np.int8), np.zeros((1, 1)),
+                                        masked_flag_list[0],np.zeros((1, 1)), np.zeros((1, naki[0].shape[1]), dtype=np.int8), np.zeros((1, 1)),
+                                        masked_flag_list[1],np.zeros((1, 1)), np.zeros((1, naki[1].shape[1]), dtype=np.int8), np.zeros((1, 1)),
+                                        masked_flag_list[2],np.zeros((1, 1)), np.zeros((1, naki[2].shape[1]), dtype=np.int8), np.zeros((1, 1)),
+                                        masked_flag_list[3],np.zeros((1, 1)), np.zeros((1, naki[3].shape[1]), dtype=np.int8), np.zeros((1, 1)),
+                                        np.zeros((1, encoded_record.shape[1]), dtype=np.int8),), axis=1)
+        return encoded_info, masked_tiles
 
-        return encoded_info
+    # 随机对手牌进行mask
+    def _mask_tehai(self, tehai: List[int], type=0) -> List[int]:
+        masked_tehai = tehai.copy()
+
+        if type == 0:
+        # 随机mask一半的牌
+            mask_num = len(tehai) // 2
+            mask_index = np.random.choice(len(tehai), mask_num, replace=False)
+            for index in mask_index:
+                masked_tehai[index] = -1
+
+        elif type == 1:
+            # mask所有的牌
+            for index in range(len(tehai)):
+                masked_tehai[index] = -1
+        
+        elif type == 2:
+            # 不mask任何牌
+            pass
+
+        return masked_tehai
 
     def _pad_matrix(self, matrix: np.ndarray, max_row: int) -> np.ndarray:
         # 参数:

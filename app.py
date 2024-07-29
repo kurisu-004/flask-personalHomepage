@@ -2,9 +2,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask.json.provider import JSONProvider
 
-from components.taikyoku_loader import Taikyoku_loader
-from components.dict import pai_dict
-import os, orjson
+from components.Taikyoku_loader import Taikyoku_loader
+from components.encoder import Encoder
+from components.Bert_like import Bert_like
+from components.dict import pai_dict, encode_dict
+import os, orjson, torch
+import numpy as np
 from enum import Enum
 
 
@@ -35,7 +38,7 @@ ALLOWED_EXTENSIONS = {'log'}  # 允许的文件扩展名
 cors = CORS(app, resources={r"/*": {"origins": "http://127.0.0.1:8000"}})
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'log')
-filename = 'test.log'
+filename = '10001.gz'
 loader = Taikyoku_loader(os.path.join(path, filename))
 loader.reset(3)
 
@@ -69,6 +72,69 @@ def step_forward():
            if item['hai'] in pai_dict:
                item['hai'] = pai_dict[item['hai']]
     return jsonify(data)
+
+@app.route('/api/predict', methods=['POST'])
+def predict():
+    data = {}  # 用于存储返回的数据
+    # 获取前端传来的数据
+
+    try:
+        data = request.get_json()
+        # print(data['player0']['tehai'])
+        # print(data['player0']['sutehai'])
+        # print(data['player1']['naki'])
+        # print(type(data))
+
+
+        # 将数据转化为模型所需的格式
+
+        encoder = Encoder(data)
+        ori_data, masked_data = encoder.encode(mask_type=1)
+        input = torch.tensor(ori_data.T, dtype=torch.float32).reshape(1, -1, 55)
+        masked_data = masked_data.T
+
+        # masked_data形状为(seq_len, 1)，其中seq_len为ori_data的列数，即ori_data的行数
+        # 使用repeat函数将masked_data的列数扩展为ori_data的列数 
+        masked_data = np.repeat(masked_data, 55, axis=1).reshape(1, -1, 55)
+
+        mask = torch.tensor(masked_data, dtype=torch.float32)
+
+        # 将mask为1的位置替换为2
+        input = torch.where(mask == 1, torch.tensor(2, dtype=torch.float32), input)
+
+        # 调用模型进行预测
+        model = Bert_like()
+        checkpoint_file = './model/predict.tar'
+        checkpoint = torch.load(checkpoint_file, map_location='cpu', weights_only=True)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.eval()
+        with torch.no_grad():
+            output = model(input)
+
+        print(output)
+        print(output.shape)
+
+        output_list = []
+        # 仅提取预测结果中mask为1的位置的值
+        for i in range(output.shape[1]):
+            if mask[0, i, 0] == 1:
+                tile = torch.argmax(output[0, i, :]).item()
+                output_list.append(tile)
+        print(output_list)
+        tile_list = [encode_dict['int_2hai'][x] for x in output_list]
+        print(tile_list)
+        # print(len(output_list))
+
+
+        # 将预测结果转化为前端所需的格式
+    
+
+        return jsonify({"status": "success", "data": tile_list})
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        pass
 
 
 if __name__ == '__main__':
