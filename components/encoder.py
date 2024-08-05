@@ -48,7 +48,10 @@ class Encoder():
         encoded_action = np.zeros((len(Action) + 1, len(actions)))
 
         for index, action in enumerate(actions):
-            encoded_action[action['action'], index] = 1
+            if type(action['action']) == Action:
+                encoded_action[action['action'].value, index] = 1
+            else:
+                encoded_action[action['action'], index] = 1
             encoded_action[-1, index] = action['player']
 
         return encoded_action
@@ -64,7 +67,12 @@ class Encoder():
         # 第11～14行表示各个玩家的点数
 
         public_info = np.zeros((14, 1))
-        public_info[0, 0] = self.exported_info['taikyoku_info']['bakaze']
+        # public_info[0, 0] = self.exported_info['taikyoku_info']['bakaze']
+        bakaze = self.exported_info['taikyoku_info']['bakaze']
+        if type(bakaze) == Bakaze:
+            public_info[0, 0] = bakaze.value
+        else:
+            public_info[0, 0] = bakaze
         public_info[1, 0] = self.exported_info['taikyoku_info']['kyoku']
         public_info[2, 0] = self.exported_info['taikyoku_info']['honba']
         public_info[3, 0] = self.exported_info['taikyoku_info']['oya']

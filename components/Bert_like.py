@@ -83,6 +83,12 @@ class Bert_like(nn.Module):
         x = self.classifier(x)
         return x
     
+    def get_hidden_state(self, x):
+        x = self.token_embed(x)
+        x = self.rope(x)
+        x = self.transformer_encoder(x)
+        return x
+    
 
 
 def vector_to_label(vector):

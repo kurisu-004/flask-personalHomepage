@@ -147,3 +147,41 @@ class Naki(Enum):
     MINKAN = auto()
     ANKAN = auto()
     KAKAN = auto()
+
+
+# 定义动作名
+action_names = {
+    Action.DRAW: "DRAW",
+    Action.DISCARD_tsumokiri: "DISCARD_tsumokiri",
+    Action.DISCARD_tegiri: "DISCARD_tegiri",
+    Action.CHI_top: "CHI_top",
+    Action.CHI_middle: "CHI_middle",
+    Action.CHI_bottom: "CHI_bottom",
+    Action.PON_fromShimo: "PON_fromShimo",
+    Action.PON_fromToimen: "PON_fromToimen",
+    Action.PON_fromKami: "PON_fromKami",
+    Action.MINKAN_fromShimo: "MINKAN_fromShimo",
+    Action.MINKAN_fromToimen: "MINKAN_fromToimen",
+    Action.MINKAN_fromKami: "MINKAN_fromKami",
+    Action.ANKAN: "ANKAN",
+    Action.KAKAN: "KAKAN",
+    Action.REACH_declear: "REACH_declear",
+    Action.REACH_success: "REACH_success",
+    Action.AGARI: "AGARI",
+    Action.PASS: "PASS"
+}
+
+# 构建解码字典
+decode_dict = {}
+num_tile = 37
+
+for action in Action:
+    if action == Action.NONE:
+        continue
+    for tile, tile_index in encode_dict['hai_2int'].items():
+        index = action.value * num_tile + tile_index
+        decode_dict[index] = f"{action_names[action]}_{tile}"
+
+# # 打印解码字典
+# for k, v in decode_dict.items():
+#     print(f"{k}: {v}")
